@@ -5,119 +5,160 @@
 
 set -e
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-CYAN='\033[0;36m'
-NC='\033[0m' # No Color
-
-# Logging functions
-log_info() { echo -e "${CYAN}[ℹ]${NC} $1"; }
-log_success() { echo -e "${GREEN}[✓]${NC} $1"; }
-log_warning() { echo -e "${YELLOW}[!]${NC} $1"; }
-log_error() { echo -e "${RED}[✗]${NC} $1"; }
-log_step() { echo -e "${BLUE}[→]${NC} $1"; }
-
-# Banner
-echo -e "${CYAN}"
-cat << "EOF"
-██╗    ██╗███████╗██████╗ ███████╗
-██║    ██║██╔════╝██╔══██╗██╔════╝
-██║ █╗ ██║█████╗  ██████╔╝███████╗
-██║███╗██║██╔══╝  ██╔══██╗╚════██║
-╚███╔███╔╝███████╗██║  ██║███████║
- ╚══╝╚══╝ ╚══════╝╚═╝  ╚═╝╚══════╝
-                                   
- ██████╗  █████╗ ████████╗ █████╗  ██████╗ ██████╗  █████╗ ███╗   ███╗
-██╔═══██╗██╔══██╗╚══██╔══╝██╔══██╗██╔════╝██╔══██╗██╔══██╗████╗ ████║
-██║   ██║███████║   ██║   ███████║██║     ██████╔╝███████║██╔████╔██║
-██║   ██║██╔══██║   ██║   ██╔══██║██║     ██╔══██╗██╔══██║██║╚██╔╝██║
-╚██████╔╝██║  ██║   ██║   ██║  ██║╚██████╗██║  ██║██║  ██║██║ ╚═╝ ██║
- ╚═════╝ ╚═╝  ╚═╝   ╚═╝   ╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝     ╚═╝
-EOF
-echo -e "${NC}"
-echo -e "${YELLOW}🚀 Quick Deploy: VPS Datagram Node Setup${NC}"
-echo "================================================"
-echo -e "${BLUE}GitHub: https://github.com/TopWebsB/datagram-setup${NC}"
-echo
-
 # Configuration
 REPO_OWNER="TopWebsB"
 REPO_NAME="datagram-setup"
 MAIN_SCRIPT_URL="https://raw.githubusercontent.com/$REPO_OWNER/$REPO_NAME/main/setup.sh"
-FALLBACK_SCRIPT_URL="https://raw.githubusercontent.com/TopWebsB/datagram-setup/main/scripts/fallback-setup.sh"
 
-# Function to create fallback setup
-create_fallback_setup() {
-    log_warning "Main setup script not found. Creating fallback setup..."
-    
-    cat > /tmp/datagram-fallback-setup.sh << 'EOF'
-#!/bin/bash
-echo "Fallback Datagram Setup"
-echo "======================"
-echo "This is a temporary fallback script."
-echo "Please check if setup.sh exists in the main repository."
-echo "Visit: https://github.com/TopWebsB/datagram-setup"
-EOF
-    
-    chmod +x /tmp/datagram-fallback-setup.sh
-    echo "/tmp/datagram-fallback-setup.sh"
-}
+# Banner
+echo "=================================================="
+echo "WEBS DATAGRAM SETUP"
+echo "=================================================="
+echo "Automated VPS Deployment for Datagram Nodes"
+echo "GitHub: https://github.com/TopWebsB/datagram-setup"
+echo "=================================================="
+echo
 
 # Function to download and verify script
 download_script() {
     local url=$1
-    local description=$2
     local temp_script="/tmp/datagram-setup-$$.sh"
     
-    log_step "Downloading $description..."
-    if curl -fsSL "$url" -o "$temp_script" && [ -s "$temp_script" ]; then
-        log_success "$description downloaded successfully"
-        echo "$temp_script"
+    echo "[INFO] Downloading setup script from TopWebsB/datagram-setup..."
+    if curl -fsSL "$url" -o "$temp_script"; then
+        if [ -s "$temp_script" ]; then
+            echo "[SUCCESS] Script downloaded successfully"
+            chmod +x "$temp_script"
+            echo "$temp_script"
+        else
+            echo "[ERROR] Downloaded script is empty"
+            return 1
+        fi
     else
-        log_warning "Failed to download $description"
+        echo "[ERROR] Failed to download setup script"
         return 1
     fi
+}
+
+# Function to check system compatibility
+check_system() {
+    echo "[INFO] Checking system compatibility..."
+    
+    # Check if Ubuntu
+    if [ ! -f /etc/os-release ]; then
+        echo "[ERROR] Unsupported operating system"
+        exit 1
+    fi
+    
+    source /etc/os-release
+    if [[ "$ID" != "ubuntu" ]]; then
+        echo "[WARNING] This script is optimized for Ubuntu. You're running $PRETTY_NAME"
+        read -p "Continue anyway? (y/N): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            exit 1
+        fi
+    fi
+    
+    echo "[SUCCESS] System check passed: $PRETTY_NAME"
+}
+
+# Function to check internet connectivity
+check_internet() {
+    echo "[INFO] Checking internet connectivity..."
+    if ! curl -s --head https://github.com > /dev/null; then
+        echo "[ERROR] No internet connection. Please check your network."
+        exit 1
+    fi
+    echo "[SUCCESS] Internet connection verified"
+}
+
+# Function to display usage
+show_usage() {
+    echo
+    echo "Usage:"
+    echo "  bash <(curl -s https://raw.githubusercontent.com/TopWebsB/datagram-setup/main/scripts/quick-deploy.sh)"
+    echo
+    echo "Options:"
+    echo "  DATAGRAM_LICENSE=your_key bash <(curl -s https://raw.githubusercontent.com/TopWebsB/datagram-setup/main/scripts/quick-deploy.sh)"
+    echo
+    echo "Examples:"
+    echo "  # Basic deployment (will prompt for license key)"
+    echo "  bash <(curl -s https://raw.githubusercontent.com/TopWebsB/datagram-setup/main/scripts/quick-deploy.sh)"
+    echo
+    echo "  # With pre-set license key"
+    echo "  DATAGRAM_LICENSE=\"abc123...\" bash <(curl -s https://raw.githubusercontent.com/TopWebsB/datagram-setup/main/scripts/quick-deploy.sh)"
+    echo
 }
 
 # Main execution
 main() {
     local temp_script
     
-    # Trap to clean up temp files
-    trap 'rm -f /tmp/datagram-setup-*.sh' EXIT
+    # Check arguments
+    if [[ "$1" == "-h" ]] || [[ "$1" == "--help" ]]; then
+        show_usage
+        exit 0
+    fi
     
-    # Download main script
-    temp_script=$(download_script "$MAIN_SCRIPT_URL" "main setup script") || {
-        log_error "Main setup script not found in repository."
+    # Initial checks
+    check_internet
+    check_system
+    
+    # Download script
+    temp_script=$(download_script "$MAIN_SCRIPT_URL") || {
         echo
-        log_info "To fix this, make sure 'setup.sh' exists in the root of your repository:"
-        log_info "https://github.com/TopWebsB/datagram-setup"
+        echo "[ERROR] Setup script not found or download failed."
         echo
-        log_info "For now, you can run the manual setup:"
+        echo "To fix this issue:"
+        echo "1. Make sure 'setup.sh' exists in your repository root"
+        echo "2. Check the file URL: $MAIN_SCRIPT_URL"
+        echo "3. Verify the repository: https://github.com/TopWebsB/datagram-setup"
+        echo
+        echo "For manual setup:"
         echo "  git clone https://github.com/TopWebsB/datagram-setup.git"
         echo "  cd datagram-setup"
         echo "  ./setup.sh"
         exit 1
     }
     
-    # Validate script
-    log_step "Validating setup script..."
-    chmod +x "$temp_script"
+    # Validate script syntax
+    echo "[INFO] Validating setup script..."
     if bash -n "$temp_script" 2>/dev/null; then
-        log_success "Script validation passed"
+        echo "[SUCCESS] Script validation passed"
     else
-        log_error "Script validation failed"
+        echo "[ERROR] Script validation failed - syntax errors detected"
         exit 1
     fi
     
     # Execute the script
-    log_step "Starting Datagram setup..."
+    echo
     echo "================================================"
+    echo "[INFO] Starting automated Datagram node setup..."
+    echo "================================================"
+    
+    # Check if license key is provided via environment
+    if [ -n "$DATAGRAM_LICENSE" ]; then
+        echo "[INFO] Using license key from environment variable"
+    else
+        echo "[INFO] You will be prompted for your license key during setup"
+    fi
+    
+    # Ask for confirmation
+    echo
+    read -p "Continue with setup? (Y/n): " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Nn]$ ]]; then
+        echo "[INFO] Setup cancelled by user"
+        exit 0
+    fi
+    
+    # Execute the main setup script
     bash "$temp_script"
 }
 
-# Run main function
+# Trap to clean up temp files
+trap 'rm -f /tmp/datagram-setup-*.sh 2>/dev/null' EXIT
+
+# Run main function with all arguments
 main "$@"
