@@ -1,33 +1,23 @@
 #!/bin/bash
 set -e
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[0;33m'
-BLUE='\033[0;34m'
-CYAN='\033[0;36m'
-NC='\033[0m' # No Color
+echo "================================================"
+echo "DATAGRAM NODE SETUP"
+echo "================================================"
 
 # Configuration
 DATAGRAM_DIR="$HOME/datagram-node"
 SCRIPT_DIR="$DATAGRAM_DIR/scripts"
 
-# Logging functions
-log_info() { echo -e "${CYAN}[INFO]${NC} $1"; }
-log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
-log_warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
-log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
-
 # Check if running as root
 if [ "$EUID" -eq 0 ]; then
-    log_error "Please don't run this script as root. Use a regular user with sudo privileges."
+    echo "[ERROR] Please don't run this script as root. Use a regular user with sudo privileges."
     exit 1
 fi
 
 # Check sudo privileges
 if ! sudo -n true 2>/dev/null; then
-    log_error "This user doesn't have sudo privileges or password is required."
+    echo "[ERROR] This user doesn't have sudo privileges or password is required."
     exit 1
 fi
 
@@ -38,10 +28,10 @@ command_exists() {
 
 # Function to install Docker
 install_docker() {
-    log_info "Installing Docker..."
+    echo "[INFO] Installing Docker..."
     
     if command_exists docker; then
-        log_warning "Docker is already installed. Skipping Docker installation."
+        echo "[INFO] Docker is already installed. Skipping Docker installation."
         return 0
     fi
 
@@ -66,90 +56,62 @@ install_docker() {
     # Add user to docker group
     sudo usermod -aG docker $USER
 
-    log_success "Docker installed successfully"
-}
-
-# Function to configure firewall
-configure_firewall() {
-    log_info "Configuring firewall (UFW)..."
-    
-    if command_exists ufw; then
-        if sudo ufw status | grep -q "active"; then
-            log_warning "UFW is already active. Ensuring necessary ports are open..."
-        else
-            sudo ufw allow OpenSSH
-            sudo ufw allow 80/tcp
-            sudo ufw allow 443/tcp
-            sudo ufw --force enable
-            log_success "UFW configured and enabled"
-        fi
-    else
-        log_warning "UFW not installed. Skipping firewall configuration."
-    fi
+    echo "[SUCCESS] Docker installed successfully"
 }
 
 # Function to install essential tools
 install_essential_tools() {
-    log_info "Installing essential tools..."
+    echo "[INFO] Installing essential tools..."
     
     sudo apt update
     sudo apt install -y \
         curl wget git htop \
-        net-tools dnsutils traceroute nmap \
-        lsof ncdu jq \
-        tmux screen neovim
+        net-tools dnsutils \
+        lsof jq
     
-    log_success "Essential tools installed"
+    echo "[SUCCESS] Essential tools installed"
 }
 
 # Function to setup datagram directory structure
 setup_directory_structure() {
-    log_info "Setting up directory structure..."
+    echo "[INFO] Setting up directory structure..."
     
     mkdir -p $DATAGRAM_DIR
     mkdir -p $SCRIPT_DIR
-    mkdir -p $DATAGRAM_DIR/logs
     
-    log_success "Directory structure created at $DATAGRAM_DIR"
+    echo "[SUCCESS] Directory structure created at $DATAGRAM_DIR"
 }
 
 # Function to create Dockerfile
 create_dockerfile() {
-    log_info "Creating Dockerfile..."
+    echo "[INFO] Creating Dockerfile..."
     
     cat > $DATAGRAM_DIR/Dockerfile << 'EOF'
 FROM ubuntu:22.04
 
-# Set environment variables to avoid interactive prompts
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install system dependencies
 RUN apt-get update && apt-get install -y \
     curl \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Download and install Datagram
 RUN curl -fsSL https://github.com/Datagram-Group/datagram-cli-release/releases/latest/download/datagram-cli-x86_64-linux \
     -o /usr/local/bin/datagram && \
     chmod +x /usr/local/bin/datagram
 
-# Create application directory
 RUN mkdir -p /app
-
-# Set working directory
 WORKDIR /app
 
-# Set entrypoint
 ENTRYPOINT ["/usr/local/bin/datagram"]
 EOF
 
-    log_success "Dockerfile created"
+    echo "[SUCCESS] Dockerfile created"
 }
 
 # Function to create docker-compose.yml
 create_docker_compose() {
-    log_info "Creating docker-compose.yml..."
+    echo "[INFO] Creating docker-compose.yml..."
     
     cat > $DATAGRAM_DIR/docker-compose.yml << 'EOF'
 version: '3.8'
@@ -167,42 +129,36 @@ services:
         max-file: "3"
     volumes:
       - datagram_data:/app
-    healthcheck:
-      test: ["CMD", "ps", "aux"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
 
 volumes:
   datagram_data:
 EOF
 
-    log_success "docker-compose.yml created"
+    echo "[SUCCESS] docker-compose.yml created"
 }
 
 # Function to create environment file
 create_env_file() {
-    log_info "Setting up environment file..."
+    echo "[INFO] Setting up environment file..."
     
     if [ -z "$DATAGRAM_LICENSE" ]; then
-        log_warning "DATAGRAM_LICENSE environment variable not set."
-        echo
-        read -p "Please enter your Datagram License Key: " LICENSE_KEY
+        echo "[INFO] Please enter your Datagram License Key"
+        read -p "License Key: " LICENSE_KEY
         
         if [ -z "$LICENSE_KEY" ]; then
-            log_error "No license key provided. Exiting."
+            echo "[ERROR] No license key provided. Exiting."
             exit 1
         fi
         
         cat > $DATAGRAM_DIR/.env << EOF
 DATAGRAM_LICENSE=$LICENSE_KEY
 EOF
-        log_success "Environment file created with provided license key"
+        echo "[SUCCESS] Environment file created with provided license key"
     else
         cat > $DATAGRAM_DIR/.env << EOF
 DATAGRAM_LICENSE=$DATAGRAM_LICENSE
 EOF
-        log_success "Environment file created with environment variable"
+        echo "[SUCCESS] Environment file created with environment variable"
     fi
     
     # Secure the .env file
@@ -211,7 +167,7 @@ EOF
 
 # Function to create management scripts
 create_management_scripts() {
-    log_info "Creating management scripts..."
+    echo "[INFO] Creating management scripts..."
     
     # Status script
     cat > $SCRIPT_DIR/status.sh << 'EOF'
@@ -220,17 +176,10 @@ cd "$(dirname "$0")/.."
 
 echo "=== Datagram Container Status ==="
 
-# Check if container is running
 if docker compose ps | grep -q "Up"; then
     echo "✅ Container: RUNNING"
-    
-    # Check recent logs for connection status
-    echo "=== Recent Logs (last 20 lines) ==="
-    docker compose logs --tail=20 | grep -E "(connected|running|ready|error|fail|warning)" || echo "No significant status messages in recent logs"
-    
-    # Check container health
-    echo "=== Container Details ==="
-    docker ps --filter "name=datagram-node" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+    echo "=== Recent Logs ==="
+    docker compose logs --tail=10
 else
     echo "❌ Container: STOPPED or NOT RUNNING"
 fi
@@ -243,12 +192,7 @@ cd "$(dirname "$0")/.."
 
 echo "Restarting Datagram container..."
 docker compose restart
-
-echo "Waiting for container to stabilize..."
-sleep 5
-
-# Show status after restart
-./scripts/status.sh
+echo "✅ Datagram service restarted"
 EOF
 
     # Logs script
@@ -260,60 +204,15 @@ echo "Showing Datagram logs (Ctrl+C to exit):"
 docker compose logs -f
 EOF
 
-    # Stop script
-    cat > $SCRIPT_DIR/stop.sh << 'EOF'
-#!/bin/bash
-cd "$(dirname "$0")/.."
-
-echo "Stopping Datagram container..."
-docker compose down
-
-echo "Current status:"
-docker compose ps
-EOF
-
-    # Start script
-    cat > $SCRIPT_DIR/start.sh << 'EOF'
-#!/bin/bash
-cd "$(dirname "$0")/.."
-
-echo "Starting Datagram container..."
-docker compose up -d
-
-echo "Waiting for startup..."
-sleep 3
-
-./scripts/status.sh
-EOF
-
-    # Update script
-    cat > $SCRIPT_DIR/update.sh << 'EOF'
-#!/bin/bash
-cd "$(dirname "$0")/.."
-
-echo "Updating Datagram container..."
-docker compose down
-docker compose build --no-cache
-docker compose up -d
-
-echo "Update completed. Current status:"
-./scripts/status.sh
-EOF
-
     # Make scripts executable
     chmod +x $SCRIPT_DIR/*.sh
     
-    # Create symlinks in main directory for easy access
-    for script in status restart logs stop start update; do
-        ln -sf $SCRIPT_DIR/$script.sh $DATAGRAM_DIR/$script-datagram.sh
-    done
-
-    log_success "Management scripts created and made executable"
+    echo "[SUCCESS] Management scripts created"
 }
 
 # Function to build and start Datagram
 build_and_start_datagram() {
-    log_info "Building and starting Datagram container..."
+    echo "[INFO] Building and starting Datagram container..."
     
     cd $DATAGRAM_DIR
     
@@ -323,54 +222,22 @@ build_and_start_datagram() {
     # Start the service
     docker compose up -d
     
-    log_success "Datagram container built and started"
-}
-
-# Function to display final information
-display_final_info() {
-    log_success "=== Setup Completed Successfully! ==="
-    echo
-    echo "📁 Installation directory: $DATAGRAM_DIR"
-    echo "🔧 Management scripts available in: $SCRIPT_DIR"
-    echo
-    echo "🚀 Quick Start Commands:"
-    echo "   cd $DATAGRAM_DIR"
-    echo "   ./status-datagram.sh          # Check status"
-    echo "   ./logs-datagram.sh            # View logs"
-    echo "   ./restart-datagram.sh         # Restart service"
-    echo "   ./stop-datagram.sh            # Stop service"
-    echo "   ./start-datagram.sh           # Start service"
-    echo "   ./update-datagram.sh          # Update container"
-    echo
-    echo "📊 Monitoring Commands:"
-    echo "   docker ps                     # List all containers"
-    echo "   docker stats                  # Container resource usage"
-    echo "   docker compose logs -f        # Follow logs"
-    echo
-    echo "⚠️  Important Notes:"
-    echo "   - Your license key is stored in: $DATAGRAM_DIR/.env"
-    echo "   - Container data is stored in Docker volume: datagram_data"
-    echo "   - Container will auto-restart on system reboot"
-    echo "   - Logs are limited to 10MB per file, 3 files max"
-    echo
-    echo "To check if everything is working, run:"
-    echo "  $DATAGRAM_DIR/scripts/status.sh"
+    echo "[SUCCESS] Datagram container built and started"
 }
 
 # Main execution function
 main() {
     echo
-    log_info "Starting VPS Datagram Automated Setup..."
+    echo "[INFO] Starting VPS Datagram Automated Setup..."
     echo "=============================================="
     
     # Part 1: Initial Server Setup & Docker Installation
-    log_info "=== PART 1: Server Setup & Docker Installation ==="
+    echo "[INFO] === PART 1: Server Setup & Docker Installation ==="
     install_essential_tools
     install_docker
-    configure_firewall
     
     # Part 2: Dockerized Datagram Setup
-    log_info "=== PART 2: Dockerized Datagram Setup ==="
+    echo "[INFO] === PART 2: Dockerized Datagram Setup ==="
     setup_directory_structure
     create_dockerfile
     create_docker_compose
@@ -378,13 +245,23 @@ main() {
     create_management_scripts
     
     # Part 3: Build and Run Datagram
-    log_info "=== PART 3: Build and Run Datagram ==="
+    echo "[INFO] === PART 3: Build and Run Datagram ==="
     build_and_start_datagram
     
     # Display final information
-    display_final_info
-    
-    log_success "Setup completed! You may need to logout and login again for Docker group changes to take effect."
+    echo
+    echo "[SUCCESS] === Setup Completed Successfully! ==="
+    echo
+    echo "Installation directory: $DATAGRAM_DIR"
+    echo "Management scripts: $SCRIPT_DIR"
+    echo
+    echo "Quick commands:"
+    echo "  cd $DATAGRAM_DIR"
+    echo "  ./scripts/status.sh    # Check status"
+    echo "  ./scripts/logs.sh      # View logs"
+    echo "  ./scripts/restart.sh   # Restart service"
+    echo
+    echo "You may need to logout and login again for Docker group changes to take effect."
 }
 
 # Run main function
