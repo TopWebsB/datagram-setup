@@ -15,4 +15,4 @@ Automated one-command setup for Datagram nodes on any VPS. Features Docker conta
 
 ### Method 1: One-Liner (Recommended)
 ```bash
-bash <(curl -s https://raw.githubusercontent.com/YOUR_USERNAME/vps-datagram-setup/main/setup.sh)
+bash <(curl -s https://raw.githubusercontent.com/TopWebsB/vps-datagram-setup/main/setup.sh)
